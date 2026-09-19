@@ -7,9 +7,19 @@ should learn at the same rate, and if ours does not, ours is wrong.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import numpy as np
 import torch
 import torch.nn as nn
+from gymnasium import spaces
 from torch import Tensor
+
+from match3.gym_env import Match3Env, encode
+from match3.levels import Episode
+from match3.players import Player
 
 
 class Policy(nn.Module):
@@ -92,3 +102,115 @@ def clipped_objective(ratio: Tensor, advantage: Tensor) -> Tensor:
     unclipped = ratio * advantage
     clipped = torch.clamp(ratio, 1 - CLIP, 1 + CLIP) * advantage
     return -torch.min(unclipped, clipped).mean()
+
+
+# Rollout and update settings, all PPO defaults.
+BATCH = 2048      # steps collected before each update
+EPOCHS = 4        # passes over that batch
+LR = 3e-4
+VALUE_COEF = 0.5    # how much the critic's error counts against the actor's
+ENTROPY_COEF = 0.01  # pressure to stay undecided, so exploration survives
+MAX_GRAD_NORM = 0.5
+
+
+def train(
+    steps: int,
+    seed: int,
+    out: Path,
+    make_env: Callable[[int], Any] | None = None,
+    batch: int = BATCH,
+) -> tuple[Path, list[float]]:
+    """Collect, score, update -- repeated until the step budget runs out.
+
+    On-policy: every batch is thrown away after the update that used it,
+    because the ratio in the clipped objective is only meaningful against the
+    policy that actually collected the data.
+
+    `make_env` exists so the loop can be checked on a task whose right answer
+    is obvious. Match-3 takes roughly a hundred updates before learning shows
+    above the noise, which is too slow to be a test and too vague to be
+    evidence that the machinery -- advantage sign, ratio, update direction --
+    is wired correctly.
+    """
+    torch.manual_seed(seed)
+    env = make_env(seed) if make_env else Match3Env(seed=seed)
+    obs_space, act_space = env.observation_space, env.action_space
+    assert isinstance(obs_space, spaces.Box) and isinstance(act_space, spaces.Discrete)
+    policy = Policy(int(obs_space.shape[0]), int(act_space.n))
+    optimiser = torch.optim.Adam(policy.parameters(), lr=LR)
+
+    obs = torch.from_numpy(env.reset(seed=seed)[0])
+    curve: list[float] = []
+    episode_reward, finished = 0.0, []
+
+    for _ in range(max(steps // batch, 1)):
+        obs_buf, act_buf, logp_buf, rew_buf, done_buf, val_buf, mask_buf = ([] for _ in range(7))
+
+        for _ in range(batch):  # ---- collect
+            mask = torch.from_numpy(env.action_masks())
+            with torch.no_grad():
+                logits, value = policy(obs.unsqueeze(0))
+                dist = torch.distributions.Categorical(
+                    logits=masked_logits(logits, mask.unsqueeze(0))
+                )
+                action = dist.sample()
+            step_obs, reward, terminated, truncated, _ = env.step(np.int64(action.item()))
+
+            obs_buf.append(obs)
+            act_buf.append(action.squeeze(0))
+            logp_buf.append(dist.log_prob(action).squeeze(0))
+            val_buf.append(value.squeeze(0))
+            mask_buf.append(mask)
+            rew_buf.append(torch.tensor(float(reward)))
+            done = terminated or truncated
+            done_buf.append(torch.tensor(float(done)))
+
+            episode_reward += float(reward)
+            if done:
+                finished.append(episode_reward)
+                episode_reward = 0.0
+                step_obs, _ = env.reset()
+            obs = torch.from_numpy(step_obs)
+
+        with torch.no_grad():  # ---- score
+            last_value = policy(obs.unsqueeze(0))[1].squeeze(0)
+        advantages, returns = gae(
+            torch.stack(rew_buf), torch.stack(val_buf), torch.stack(done_buf), last_value
+        )
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        batch_obs, batch_act = torch.stack(obs_buf), torch.stack(act_buf)
+        batch_logp, batch_mask = torch.stack(logp_buf), torch.stack(mask_buf)
+
+        for _ in range(EPOCHS):  # ---- update
+            logits, values = policy(batch_obs)
+            dist = torch.distributions.Categorical(logits=masked_logits(logits, batch_mask))
+            ratio = torch.exp(dist.log_prob(batch_act) - batch_logp)
+            loss = (
+                clipped_objective(ratio, advantages)
+                + VALUE_COEF * ((values - returns) ** 2).mean()
+                - ENTROPY_COEF * dist.entropy().mean()
+            )
+            optimiser.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(policy.parameters(), MAX_GRAD_NORM)
+            optimiser.step()
+
+        curve.append(float(np.mean(finished[-20:])) if finished else 0.0)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(policy.state_dict(), out)
+    return out, curve
+
+
+def ppo_player(policy: Policy) -> Player:
+    """Adapt a trained policy to the plain Player signature."""
+
+    def play(episode: Episode, rng: np.random.Generator) -> int:
+        obs = torch.from_numpy(encode(episode)).unsqueeze(0)
+        mask = torch.from_numpy(episode.legal()).unsqueeze(0)
+        with torch.no_grad():
+            logits, _ = policy(obs)
+        return int(masked_logits(logits, mask).argmax(dim=-1).item())
+
+    return play

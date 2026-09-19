@@ -36,5 +36,12 @@ strict = true
 module = ["stable_baselines3.*", "sb3_contrib.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# torch.distributions.Categorical ships no annotations, so sample(), log_prob()
+# and entropy() read as untyped calls. The gap is the library's, not ours, and
+# narrowing it to this module keeps the rest of the package strict.
+module = ["match3.ppo"]
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

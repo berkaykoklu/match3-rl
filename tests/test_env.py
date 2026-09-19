@@ -1,6 +1,18 @@
 import numpy as np
 
-from match3.env import COLOURS, COLS, ROWS, Board, collapse, find_matches
+from match3.env import (
+    COLOURS,
+    COLS,
+    ROWS,
+    SWAPS,
+    Board,
+    apply_swap,
+    collapse,
+    find_matches,
+    legal_moves,
+    new_board,
+    settle,
+)
 
 
 def plain() -> Board:
@@ -106,3 +118,53 @@ def test_collapsing_nothing_leaves_the_board_alone() -> None:
     empty = np.zeros(board.shape, dtype=np.bool_)
 
     assert (collapse(board, empty, rng) == board).all()
+
+
+def test_there_is_one_swap_for_every_adjacent_pair() -> None:
+    assert len(SWAPS) == 2 * ROWS * (COLS - 1)  # 60 on a 6x6 board
+
+
+def test_a_swap_exchanges_exactly_two_cells() -> None:
+    board = plain()
+    swapped = apply_swap(board, (0, 0, 0, 1))
+
+    assert swapped[0, 0] == board[0, 1]
+    assert swapped[0, 1] == board[0, 0]
+    assert (swapped[1:] == board[1:]).all()
+
+
+def test_settling_leaves_no_matches_behind() -> None:
+    rng = np.random.default_rng(3)
+    board = rng.integers(0, COLOURS, size=(ROWS, COLS), dtype=np.int8)
+
+    settled, _ = settle(board, rng)
+
+    assert not find_matches(settled).any()
+
+
+def test_settling_counts_the_tiles_it_cleared() -> None:
+    rng = np.random.default_rng(0)
+    board = plain()
+    board[5, 0:3] = 3
+
+    _, cleared = settle(board, rng)
+
+    assert cleared.shape == (COLOURS,)
+    assert cleared[3] >= 3
+
+
+def test_a_new_board_starts_with_no_matches() -> None:
+    for seed in range(20):
+        board = new_board(np.random.default_rng(seed))
+        assert not find_matches(board).any()
+
+
+def test_a_legal_move_actually_produces_a_match() -> None:
+    rng = np.random.default_rng(7)
+    board = new_board(rng)
+    legal = legal_moves(board)
+
+    assert legal.shape == (len(SWAPS),)
+    for i, is_legal in enumerate(legal):
+        produced = find_matches(apply_swap(board, SWAPS[i])).any()
+        assert produced == is_legal

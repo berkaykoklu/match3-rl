@@ -49,3 +49,46 @@ def collapse(board: Board, matched: Mask, rng: np.random.Generator) -> Board:
         fresh = rng.integers(0, COLOURS, size=gaps, dtype=np.int8)
         out[:, c] = np.concatenate([fresh, survivors])
     return out
+
+
+Swap = tuple[int, int, int, int]
+
+SWAPS: list[Swap] = [
+    *[(r, c, r, c + 1) for r in range(ROWS) for c in range(COLS - 1)],
+    *[(r, c, r + 1, c) for r in range(ROWS - 1) for c in range(COLS)],
+]
+
+
+def apply_swap(board: Board, swap: Swap) -> Board:
+    r1, c1, r2, c2 = swap
+    out = board.copy()
+    out[r1, c1], out[r2, c2] = board[r2, c2], board[r1, c1]
+    return out
+
+
+def settle(board: Board, rng: np.random.Generator) -> tuple[Board, npt.NDArray[np.int64]]:
+    """Resolve cascades until the board is stable, counting what was cleared."""
+    cleared = np.zeros(COLOURS, dtype=np.int64)
+    out = board
+    while True:
+        matched = find_matches(out)
+        if not matched.any():
+            return out, cleared
+        for colour in range(COLOURS):
+            cleared[colour] += int((matched & (out == colour)).sum())
+        out = collapse(out, matched, rng)
+
+
+def legal_moves(board: Board) -> Mask:
+    """Mark the swaps that produce at least one match."""
+    return np.array(
+        [find_matches(apply_swap(board, swap)).any() for swap in SWAPS],
+        dtype=np.bool_,
+    )
+
+
+def new_board(rng: np.random.Generator) -> Board:
+    """A starting board with nothing already matched on it."""
+    board = rng.integers(0, COLOURS, size=(ROWS, COLS), dtype=np.int8)
+    settled, _ = settle(board, rng)
+    return settled

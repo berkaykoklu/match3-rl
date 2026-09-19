@@ -44,3 +44,26 @@ def test_a_different_seed_can_give_a_different_answer() -> None:
     """Guards against a seed that is accepted and then quietly ignored."""
     rates = {solve_rate(LEVELS[19], random_player, episodes=20, seed=s) for s in range(6)}
     assert len(rates) > 1
+
+
+def test_the_greedy_player_only_ever_picks_a_legal_move() -> None:
+    from match3.players import greedy_player
+
+    rng = np.random.default_rng(0)
+    episode = Episode(LEVELS[0], seed=0)
+    for _ in range(3):
+        if episode.done or not episode.legal().any():
+            break
+        action = greedy_player(episode, rng)
+        assert episode.legal()[action]
+        episode.step(action)
+
+
+def test_greedy_beats_random_on_a_level_where_there_is_room() -> None:
+    """The upper reference has to actually be better, or it bounds nothing."""
+    from match3.players import greedy_player
+
+    level = LEVELS[19]
+    assert solve_rate(level, greedy_player, episodes=15, seed=1) > solve_rate(
+        level, random_player, episodes=15, seed=1
+    )

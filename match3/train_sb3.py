@@ -20,9 +20,15 @@ from match3.players import Player
 DEFAULT_STEPS = 200_000
 
 
-def train(steps: int, seed: int, out: Path) -> Path:
+def train(steps: int, seed: int, out: Path, verbose: int = 0) -> Path:
+    """Train and save. `verbose=1` prints progress.
+
+    Silence is the default so the tests stay readable, but a run long enough to
+    walk away from needs to say where it is -- a two-million-step run that
+    prints nothing is indistinguishable from one that has hung.
+    """
     env = Match3Env(seed=seed)
-    model = MaskablePPO("MlpPolicy", env, seed=seed, verbose=0)
+    model = MaskablePPO("MlpPolicy", env, seed=seed, verbose=verbose)
     model.learn(total_timesteps=steps)
     out.parent.mkdir(parents=True, exist_ok=True)
     model.save(out)
@@ -44,8 +50,9 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=DEFAULT_STEPS)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, default=Path("runs/sb3"))
+    parser.add_argument("--quiet", action="store_true", help="suppress progress output")
     args = parser.parse_args()
-    saved = train(args.steps, args.seed, args.out)
+    saved = train(args.steps, args.seed, args.out, verbose=0 if args.quiet else 1)
     print(f"saved {saved}")
 
 

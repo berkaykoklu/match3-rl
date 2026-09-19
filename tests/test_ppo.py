@@ -2,7 +2,7 @@ import torch
 
 from match3.env import SWAPS
 from match3.gym_env import OBS_SIZE
-from match3.ppo import Policy, gae
+from match3.ppo import Policy, clipped_objective, gae, masked_logits
 
 
 def test_the_policy_returns_one_logit_per_action_and_one_value() -> None:
@@ -92,3 +92,53 @@ def test_discounting_makes_a_distant_reward_worth_less() -> None:
     _, returns = gae(rewards, values, dones, torch.tensor(0.0), gamma=0.5, lam=1.0)
 
     assert abs(returns[0].item() - 0.25) < 1e-5  # 1.0 discounted twice
+
+
+def test_masking_makes_illegal_actions_impossible_to_sample() -> None:
+    probs = torch.softmax(
+        masked_logits(torch.tensor([[1.0, 5.0, 1.0]]), torch.tensor([[True, False, True]])),
+        dim=-1,
+    )
+
+    assert probs[0, 1].item() == 0.0
+    assert abs(probs.sum().item() - 1.0) < 1e-5
+
+
+def test_masking_leaves_the_legal_actions_in_proportion() -> None:
+    probs = torch.softmax(
+        masked_logits(torch.tensor([[2.0, 9.0, 2.0]]), torch.tensor([[True, False, True]])),
+        dim=-1,
+    )
+
+    assert abs(probs[0, 0].item() - probs[0, 2].item()) < 1e-6
+
+
+def test_an_unchanged_policy_has_a_ratio_of_one_and_loses_nothing_to_clipping() -> None:
+    ratio = torch.tensor([1.0])
+    advantage = torch.tensor([2.0])
+
+    assert clipped_objective(ratio, advantage).item() == -2.0
+
+
+def test_a_huge_increase_on_a_good_action_is_capped() -> None:
+    """Without the cap one lucky episode would swing the policy."""
+    advantage = torch.tensor([1.0])
+
+    capped = clipped_objective(torch.tensor([5.0]), advantage)
+    modest = clipped_objective(torch.tensor([1.2]), advantage)
+
+    assert abs(capped.item() - modest.item()) < 1e-6
+
+
+def test_a_huge_decrease_on_a_bad_action_is_capped() -> None:
+    advantage = torch.tensor([-1.0])
+
+    capped = clipped_objective(torch.tensor([0.01]), advantage)
+    modest = clipped_objective(torch.tensor([0.8]), advantage)
+
+    assert abs(capped.item() - modest.item()) < 1e-6
+
+
+def test_a_small_change_is_left_alone() -> None:
+    """Inside the trust region the objective is the plain one."""
+    assert abs(clipped_objective(torch.tensor([1.1]), torch.tensor([2.0])).item() + 2.2) < 1e-5

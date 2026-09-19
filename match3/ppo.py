@@ -65,3 +65,30 @@ def gae(
         advantages[t] = running
         next_value = values[t]
     return advantages, advantages + values
+
+
+# How far one update may move a single action's probability. 0.2 is PPO's
+# published value: the whole point of the algorithm is that this is small.
+CLIP = 0.2
+
+
+def masked_logits(logits: Tensor, mask: Tensor) -> Tensor:
+    """Push illegal actions to negative infinity so softmax gives them zero.
+
+    Not a penalty the agent has to learn from -- a move it never sees. Learning
+    which swaps are legal would cost thousands of steps that teach nothing
+    about playing well.
+    """
+    return logits.masked_fill(~mask, float("-inf"))
+
+
+def clipped_objective(ratio: Tensor, advantage: Tensor) -> Tensor:
+    """PPO's loss: follow the advantage, but refuse to take a large step.
+
+    The minimum is what makes this pessimistic. A ratio that ran away is worth
+    no more than one that stopped at the edge of the trust region, so there is
+    nothing to gain by running away -- in either direction.
+    """
+    unclipped = ratio * advantage
+    clipped = torch.clamp(ratio, 1 - CLIP, 1 + CLIP) * advantage
+    return -torch.min(unclipped, clipped).mean()

@@ -18,6 +18,14 @@ from match3.env import SWAPS, Board, apply_swap, legal_moves, new_board, settle
 
 @dataclass(frozen=True)
 class Level:
+    """A goal and a budget -- not a particular board.
+
+    Each attempt deals a fresh arrangement, the way a real match-3 deals fresh
+    colours onto a fixed layout. Pinning the board instead would make every
+    attempt identical, and a deterministic player would then score 0% or 100%
+    on every level: a verdict rather than the rate a difficulty curve needs.
+    """
+
     number: int
     colour: int
     target: int

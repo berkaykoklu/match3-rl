@@ -1,0 +1,40 @@
+[project]
+name = "match3-rl"
+version = "0.1.0"
+description = "Measuring match-3 level difficulty with a reinforcement learning agent"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.1",
+    "gymnasium>=1.0",
+    "stable-baselines3>=2.4",
+    "sb3-contrib>=2.4",
+    "torch>=2.5",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.8", "mypy>=1.13"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["match3"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+files = ["match3", "tests"]
+strict = true
+
+[[tool.mypy.overrides]]
+# Neither ships type stubs.
+module = ["stable_baselines3.*", "sb3_contrib.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

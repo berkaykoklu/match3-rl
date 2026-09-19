@@ -1,6 +1,6 @@
 import numpy as np
 
-from match3.env import COLS, ROWS, Board, find_matches
+from match3.env import COLOURS, COLS, ROWS, Board, collapse, find_matches
 
 
 def plain() -> Board:
@@ -63,3 +63,46 @@ def test_crossing_runs_are_both_matched() -> None:
     matched = find_matches(board)
 
     assert matched.sum() == 5  # three across plus three down, sharing one cell
+
+
+def test_cleared_cells_are_refilled_so_the_board_stays_full() -> None:
+    rng = np.random.default_rng(0)
+    board = plain()
+    board[5, 0:3] = 3
+    matched = find_matches(board)
+
+    result = collapse(board, matched, rng)
+
+    assert result.shape == board.shape
+    assert ((result >= 0) & (result < COLOURS)).all()
+
+
+def test_tiles_above_a_cleared_cell_fall_into_it() -> None:
+    rng = np.random.default_rng(0)
+    board = plain()
+    board[5, 0:3] = 3          # bottom row will clear
+    board[4, 0] = 2            # this specific tile should land on the bottom row
+    matched = find_matches(board)
+
+    result = collapse(board, matched, rng)
+
+    assert result[5, 0] == 2
+
+
+def test_collapse_does_not_mutate_the_board_it_was_given() -> None:
+    rng = np.random.default_rng(0)
+    board = plain()
+    board[5, 0:3] = 3
+    before = board.copy()
+
+    collapse(board, find_matches(board), rng)
+
+    assert (board == before).all()
+
+
+def test_collapsing_nothing_leaves_the_board_alone() -> None:
+    rng = np.random.default_rng(0)
+    board = plain()
+    empty = np.zeros(board.shape, dtype=np.bool_)
+
+    assert (collapse(board, empty, rng) == board).all()

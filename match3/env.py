@@ -40,9 +40,10 @@ def find_matches(board: Board) -> Mask:
 def collapse(board: Board, matched: Mask, rng: np.random.Generator) -> Board:
     """Clear matched cells, drop survivors into the gaps, refill from the top."""
     out = board.copy()
-    for c in range(COLS):
+    rows, cols = board.shape
+    for c in range(cols):
         survivors = out[:, c][~matched[:, c]]
-        gaps = ROWS - len(survivors)
+        gaps = rows - len(survivors)
         if gaps == 0:
             continue
         fresh = rng.integers(0, COLOURS, size=gaps, dtype=np.int8)

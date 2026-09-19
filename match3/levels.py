@@ -24,14 +24,30 @@ class Level:
     moves: int
 
 
-def _build_levels() -> list[Level]:
-    """Forty levels whose targets rise and whose move budgets tighten.
+# Target tiles a random player collects per move, measured over 30 episodes.
+# Cascades are why this is far above three-quarters of a single match: one swap
+# often sets off several. The level table is built against this number because
+# a table built against a guess turned out to be trivially easy -- every level
+# was clearable by chance, which leaves no difficulty curve to measure.
+RANDOM_TILES_PER_MOVE = 2.38
 
-    The progression is deliberately smooth: no level is designed to be a wall.
-    Any spike the agent finds is therefore a property of the game, not of the
-    level table -- which is the whole point of measuring instead of asserting.
-    """
-    return [Level(number=i + 1, colour=i % 4, target=8 + i, moves=25 - i // 4) for i in range(40)]
+# Share of what a random player could collect that each level actually demands,
+# swept from comfortable to out of reach. The sweep is deliberately linear: the
+# demand curve is smooth by construction, so any step in the *solve* curve is a
+# property of the game rather than something the table put there.
+EASIEST_DEMAND = 0.35
+HARDEST_DEMAND = 1.35
+
+
+def _build_levels() -> list[Level]:
+    """Forty levels whose targets rise and whose move budgets tighten."""
+    levels: list[Level] = []
+    for i in range(40):
+        moves = 25 - i // 4
+        demand = EASIEST_DEMAND + (HARDEST_DEMAND - EASIEST_DEMAND) * i / 39
+        target = round(moves * RANDOM_TILES_PER_MOVE * demand)
+        levels.append(Level(number=i + 1, colour=i % 4, target=target, moves=moves))
+    return levels
 
 
 LEVELS: list[Level] = _build_levels()

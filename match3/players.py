@@ -48,16 +48,21 @@ def greedy_player(episode: Episode, rng: np.random.Generator) -> int:
     agent from above the way the random player bounds it from below: an agent
     that cannot beat pure greed has learned tactics but no strategy, and saying
     so is more useful than reporting a win over random alone.
+
+    Cascades carry most of the tiles, so each swap is played out rather than
+    judged on its first match -- but with the caller's generator, drawn fresh
+    each time. An earlier version reused a fixed seed to keep the comparison
+    between swaps fair, which instead judged every swap against one invented
+    future: seed 0 deals colour 3 six times in its first twelve draws and
+    colour 1 once, so levels asking for colour 3 looked easy. Real randomness
+    is noisier per move and unbiased over an episode, which is the trade that
+    matters when the measurement averages hundreds of them.
     """
+    board, colour = episode.board, episode.level.colour
     best, best_gain = -1, -1
     for action in np.flatnonzero(episode.legal()):
-        # settle() consumes randomness, so each trial gets its own generator
-        # seeded the same way; otherwise the comparison measures luck.
-        _, cleared = settle(
-            apply_swap(episode.board, SWAPS[int(action)]),
-            np.random.default_rng(0),
-        )
-        gain = int(cleared[episode.level.colour])
+        _, cleared = settle(apply_swap(board, SWAPS[int(action)]), rng)
+        gain = int(cleared[colour])
         if gain > best_gain:
             best, best_gain = int(action), gain
     return best

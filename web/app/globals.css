@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* Four near-black steps rather than one flat ground: depth is what separates a
+   product from a styled document. The tile colours are the only saturated
+   things on the page, because they are the only things carrying data. */
+@theme {
+  --color-base: #08090a;
+  --color-panel: #0d0f12;
+  --color-raised: #13161b;
+
+  --color-line: #1f242b;
+  --color-line-lit: #2e343d;
+
+  --color-hi: #f4f5f7;
+  --color-mid: #9aa2ae;
+  --color-low: #79818e;
+
+  /* One hue per player, used everywhere that player appears -- curve, legend,
+     replay header. A reader learns the mapping once. */
+  --color-random: #79818e;
+  --color-short: #7c6cff;
+  --color-agent: #6d8cff;
+  --color-greedy: #4dd8e8;
+
+  --color-flag: #f0a58c;
+
+  --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html { color-scheme: dark; scroll-behavior: smooth; }
+
+  body {
+    background: var(--color-base);
+    color: var(--color-hi);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-agent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .display {
+    font-weight: 600;
+    letter-spacing: -0.045em;
+    line-height: 0.95;
+  }
+
+  .lift {
+    background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-line-lit) 70%, transparent),
+      0 18px 48px -26px rgba(0, 0, 0, 0.9);
+  }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--color-low);
+  }
+
+  .scroll-x { overflow-x: auto; overscroll-behavior-x: contain; }
+  .scroll-x::-webkit-scrollbar { height: 4px; }
+  .scroll-x::-webkit-scrollbar-thumb { background: var(--color-line-lit); border-radius: 2px; }
+}

@@ -23,3 +23,14 @@ def spikes(rates: list[float], threshold: float = SPIKE_THRESHOLD) -> list[int]:
 def curve(player: Player, episodes: int, seed: int) -> list[float]:
     """Solve rate for every level, in order."""
     return [solve_rate(level, player, episodes, seed) for level in LEVELS]
+
+
+def skill_sensitivity(weak: list[float], strong: list[float]) -> list[float]:
+    """How much a level separates a considered player from a careless one.
+
+    Difficulty is not one number per level: it is one number per level *and*
+    player. The spread between two players is the part a designer can act on --
+    a level everyone clears teaches nothing, and a level nobody clears teaches
+    nothing either. Only the gap says the level rewards thinking.
+    """
+    return [s - w for w, s in zip(weak, strong, strict=True)]

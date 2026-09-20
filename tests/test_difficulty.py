@@ -1,4 +1,4 @@
-from match3.difficulty import difficulty, spikes
+from match3.difficulty import difficulty, skill_sensitivity, spikes
 
 
 def test_difficulty_is_the_complement_of_the_solve_rate() -> None:
@@ -37,3 +37,26 @@ def test_the_threshold_separates_drops_that_are_clearly_either_side() -> None:
     """
     assert spikes([0.9, 0.69], threshold=0.2) == [1]
     assert spikes([0.9, 0.71], threshold=0.2) == []
+
+
+def test_a_level_everyone_clears_separates_nobody() -> None:
+    assert skill_sensitivity([1.0], [1.0]) == [0.0]
+
+
+def test_a_level_nobody_clears_separates_nobody() -> None:
+    assert skill_sensitivity([0.0], [0.0]) == [0.0]
+
+
+def test_the_gap_is_the_measure_not_the_difficulty() -> None:
+    """Two levels of very different difficulty can separate players equally."""
+    easy_ish = skill_sensitivity([0.5], [0.9])
+    hard_ish = skill_sensitivity([0.1], [0.5])
+
+    assert easy_ish == hard_ish == [0.4]
+
+
+def test_mismatched_curves_are_refused_rather_than_silently_truncated() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        skill_sensitivity([0.1, 0.2], [0.5])

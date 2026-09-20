@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run mypy
+      # The training tests are slow, but they are the ones that would catch a
+      # broken environment or a PPO that stopped learning, so they run here
+      # rather than being skipped for speed.
+      - run: uv run pytest -q

@@ -2,8 +2,19 @@ import data from "@/public/results.json";
 
 export type Level = { number: number; colour: number; target: number; moves: number };
 
-export type Frame = { board: number[][]; collected: number; moves_left: number };
-export type Replay = { won: boolean; frames: Frame[] };
+/** One cascade round: what matched, and the board once it had fallen. */
+export type Round = { matched: [number, number][]; after: number[][] };
+
+export type Move = {
+  swap: [number, number, number, number];
+  /** The board the swap produced, before anything cleared. */
+  swapped: number[][];
+  rounds: Round[];
+  collected: number;
+  moves_left: number;
+};
+
+export type Replay = { won: boolean; start: number[][]; moves: Move[] };
 
 export type PlayerKey = "random" | "agent_200k" | "agent" | "greedy";
 
@@ -18,6 +29,7 @@ export type Results = {
   skill_sensitivity: number[];
   replays: Record<string, Record<string, Replay>>;
   replay_levels: number[];
+  replay_seeds: Record<string, number>;
   learning_curves?: { ours: number[]; sb3: number[] };
 };
 

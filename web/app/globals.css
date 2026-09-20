@@ -54,6 +54,14 @@
 }
 
 @layer utilities {
+  /* A tile that falls is mounted where it lands and animated back from where
+     it came, so one keyframe covers every distance: the offset rides in on a
+     custom property rather than needing a rule per row. */
+  @keyframes drop {
+    from { transform: translateY(var(--drop-from, 0px)); }
+    to   { transform: translateY(0); }
+  }
+
   .tnum { font-variant-numeric: tabular-nums; }
 
   .display {
@@ -79,4 +87,14 @@
   .scroll-x { overflow-x: auto; overscroll-behavior-x: contain; }
   .scroll-x::-webkit-scrollbar { height: 4px; }
   .scroll-x::-webkit-scrollbar-thumb { background: var(--color-line-lit); border-radius: 2px; }
+}
+
+/* The replay is the one place motion carries information rather than
+   decoration, so reduced motion keeps the steps and drops the travel: tiles
+   appear where they land instead of sliding there. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes drop {
+    from { transform: translateY(0); }
+    to   { transform: translateY(0); }
+  }
 }

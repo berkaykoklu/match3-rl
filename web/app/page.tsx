@@ -72,7 +72,9 @@ export default function Home() {
         <p className="mt-3 max-w-[62ch] text-[0.95rem] leading-relaxed text-mid">
           Every player below is dealt the identical starting board, so what differs is
           the choices, not the luck. Averages hide what that looks like; the boards do
-          not.
+          not. These three deals are picked rather than drawn — an arbitrary seed gave
+          three levels where everyone won or everyone lost, which illustrates nothing.
+          The curves above are the measurement; these are one episode inside them.
         </p>
 
         {results.replay_levels.map((number) => {

@@ -16,7 +16,7 @@ import numpy as np
 from sb3_contrib import MaskablePPO
 
 from match3.difficulty import SPIKE_SIGMAS, noise_threshold, skill_sensitivity, spikes
-from match3.env import COLOURS, COLS, ROWS
+from match3.env import COLOURS, COLS, ROWS, SWAPS, apply_swap
 from match3.levels import LEVELS, Episode, Level
 from match3.players import Player, greedy_player, random_player
 from match3.train_sb3 import sb3_player
@@ -30,24 +30,42 @@ REPLAY_SEED = 11
 
 
 def replay(level: Level, player: Player, seed: int) -> dict[str, Any]:
-    """Every board state of one episode, with the score as it stood.
+    """One episode, recorded in enough detail to be played back as a game.
+
+    Two stored boards tell a viewer nothing about what happened between them.
+    Each move keeps the swap, the board the swap produced, and every cascade
+    round after it -- what matched, and what the board became once it fell.
 
     All three players start from the same seed, so the first board is identical
     and the run diverges only where their choices do.
     """
     episode = Episode(level, seed=seed)
     rng = np.random.default_rng(seed)
-    frames = [{"board": episode.board.tolist(), "collected": 0, "moves_left": episode.moves_left}]
+    start = episode.board.tolist()
+    moves: list[dict[str, Any]] = []
+
     while not episode.done and episode.legal().any():
-        episode.step(player(episode, rng))
-        frames.append(
+        action = player(episode, rng)
+        swapped = apply_swap(episode.board, SWAPS[action]).tolist()
+        rounds: list[tuple[Any, Any]] = []
+        episode.step(action, rounds)
+        moves.append(
             {
-                "board": episode.board.tolist(),
+                "swap": list(SWAPS[action]),
+                "swapped": swapped,
+                "rounds": [
+                    {
+                        "matched": [[int(r), int(c)] for r, c in zip(*np.nonzero(m), strict=True)],
+                        "after": b.tolist(),
+                    }
+                    for m, b in rounds
+                ],
                 "collected": episode.collected,
                 "moves_left": episode.moves_left,
             }
         )
-    return {"won": episode.won, "frames": frames}
+
+    return {"won": episode.won, "start": start, "moves": moves}
 
 
 def build(curves_file: Path, compare_file: Path | None) -> dict[str, Any]:

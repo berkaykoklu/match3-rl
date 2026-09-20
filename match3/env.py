@@ -66,8 +66,18 @@ def apply_swap(board: Board, swap: Swap) -> Board:
     return out
 
 
-def settle(board: Board, rng: np.random.Generator) -> tuple[Board, npt.NDArray[np.int64]]:
-    """Resolve cascades until the board is stable, counting what was cleared."""
+def settle(
+    board: Board,
+    rng: np.random.Generator,
+    rounds: list[tuple[Mask, Board]] | None = None,
+) -> tuple[Board, npt.NDArray[np.int64]]:
+    """Resolve cascades until the board is stable, counting what was cleared.
+
+    Pass `rounds` to keep each step instead of only where it ended up. The game
+    needs the final board; a replay needs to show what matched and what fell,
+    and re-deriving that outside would mean a second copy of this loop that can
+    drift from it.
+    """
     cleared = np.zeros(COLOURS, dtype=np.int64)
     out = board
     while True:
@@ -77,6 +87,8 @@ def settle(board: Board, rng: np.random.Generator) -> tuple[Board, npt.NDArray[n
         for colour in range(COLOURS):
             cleared[colour] += int((matched & (out == colour)).sum())
         out = collapse(out, matched, rng)
+        if rounds is not None:
+            rounds.append((matched, out))
 
 
 def legal_moves(board: Board) -> Mask:

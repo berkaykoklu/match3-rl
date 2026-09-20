@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from match3.env import SWAPS, Board, apply_swap, legal_moves, new_board, settle
+from match3.env import SWAPS, Board, Mask, apply_swap, legal_moves, new_board, settle
 
 
 @dataclass(frozen=True)
@@ -82,12 +82,15 @@ class Episode:
     def legal(self) -> npt.NDArray[np.bool_]:
         return legal_moves(self.board)
 
-    def step(self, action: int) -> int:
-        """Play a swap. Returns how many target-colour tiles it cleared."""
+    def step(self, action: int, rounds: list[tuple[Mask, Board]] | None = None) -> int:
+        """Play a swap. Returns how many target-colour tiles it cleared.
+
+        `rounds` is for replays: pass a list and each cascade step lands in it.
+        """
         if not self.legal()[action]:
             raise ValueError(f"action {action} does not produce a match")
         swapped = apply_swap(self.board, SWAPS[action])
-        self.board, cleared = settle(swapped, self._rng)
+        self.board, cleared = settle(swapped, self._rng, rounds)
         self.moves_left -= 1
         gained = int(cleared[self.level.colour])
         self.collected += gained

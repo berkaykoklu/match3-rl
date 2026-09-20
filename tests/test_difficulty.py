@@ -1,4 +1,4 @@
-from match3.difficulty import difficulty, skill_sensitivity, spikes
+from match3.difficulty import difficulty, noise_threshold, skill_sensitivity, spikes
 
 
 def test_difficulty_is_the_complement_of_the_solve_rate() -> None:
@@ -60,3 +60,24 @@ def test_mismatched_curves_are_refused_rather_than_silently_truncated() -> None:
 
     with pytest.raises(ValueError):
         skill_sensitivity([0.1, 0.2], [0.5])
+
+
+def test_more_episodes_make_the_threshold_stricter() -> None:
+    """A quieter measurement should be allowed to call a smaller drop real."""
+    rates = [0.5] * 10
+
+    assert noise_threshold(rates, episodes=400) < noise_threshold(rates, episodes=60)
+
+
+def test_a_curve_near_the_ceiling_needs_a_smaller_drop_to_convince() -> None:
+    """A proportion close to 1 barely wobbles, so less movement means more."""
+    assert noise_threshold([0.97] * 10, 100) < noise_threshold([0.5] * 10, 100)
+
+
+def test_the_threshold_is_three_standard_errors_of_a_difference() -> None:
+    import math
+
+    rates = [0.5] * 10
+    expected = 3.0 * math.sqrt(0.25 / 100) * math.sqrt(2)
+
+    assert abs(noise_threshold(rates, 100) - expected) < 1e-12
